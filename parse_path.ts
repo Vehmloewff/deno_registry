@@ -1,13 +1,11 @@
-import { utils } from './code-master/deps.ts'
+import { LocationData, ResourceDataUnsureVersion } from './fetcher.ts'
+import { BadParamsError } from './deps.ts'
 
 const patternForErrors = '/<repo>[@<version>]/<filepath>[:<line>[:<col>]]'
 
 export interface ParsedPath {
-	repo: string
-	version: string | null
-	path: string
-	line: number | null
-	col: number | null
+	resource: ResourceDataUnsureVersion
+	location: LocationData | null
 }
 
 export function parsePath(path: string): ParsedPath {
@@ -15,17 +13,21 @@ export function parsePath(path: string): ParsedPath {
 	const pathSections = fullPath.slice(1).split('/')
 	const [repoAndVersion] = pathSections
 	const filepath = `/${pathSections.slice(1).join('/')}`
-	const [repo, version] = repoAndVersion.split('@')
+	const [pkg, version] = repoAndVersion.split('@')
 
-	if (!repo) throw new utils.BadParamsError(`You must specify a repo.  Expected a path pattern of ${patternForErrors}`)
-	if (!filepath) throw new utils.BadParamsError(`You must specify a filepath.  Expected a path pattern of ${patternForErrors}`)
+	if (!pkg) throw new BadParamsError(`You must specify a repo.  Expected a path pattern of ${patternForErrors}`)
+	if (filepath === '/') throw new BadParamsError(`You must specify a filepath.  Expected a path pattern of ${patternForErrors}`)
+
+	const line = parseToNum(lineStr)
+	const col = parseToNum(colStr)
 
 	return {
-		repo,
-		version: version || null,
-		path: filepath,
-		line: parseToNum(lineStr),
-		col: parseToNum(colStr),
+		resource: {
+			pkg,
+			version: version || null,
+			path: filepath,
+		},
+		location: line === null ? null : { line, col: col ?? 0 },
 	}
 }
 
@@ -33,7 +35,7 @@ function parseToNum(content: string | undefined) {
 	if (!content) return null
 
 	const num = parseInt(content)
-	if (isNaN(num)) throw new utils.BadParamsError(`Expected "${content}" to be a number`)
+	if (isNaN(num)) throw new BadParamsError(`Expected "${content}" to be a number`)
 
 	return num
 }

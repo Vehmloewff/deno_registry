@@ -1,10 +1,25 @@
-import { rooter } from './deps.ts'
-import { Fetcher } from './fetcher.ts'
+import { BadParamsError, makeHandler, makeRoute } from './deps.ts'
+import { Fetcher, ResourceData } from './fetcher.ts'
 import { parsePath } from './parse_path.ts'
 
 export type RegistryHandler = (request: Request) => Promise<Response>
 
-const registryJson = rooter.makeRoute('GET /.well-known/deno-import-intellisense.json', () => {
+export {
+	BadParamsError,
+	isBadParamsError,
+	isForbiddenError,
+	isNotAuthenticatedError,
+	isNotFoundError,
+	isUserError,
+	NotAuthenticatedError,
+	NotFoundError,
+	UserError,
+} from './deps.ts'
+
+export * from './fetcher.ts'
+
+// TODO connect these
+const _registryJson = makeRoute('GET /.well-known/deno-import-intellisense.json', () => {
 	return Response.json({
 		version: 2,
 		registries: [{
@@ -29,20 +44,55 @@ const registryJson = rooter.makeRoute('GET /.well-known/deno-import-intellisense
 
 function getAuthToken(request: Request): string | null {
 	// TODO support cookies for web portal
-	return request.headers.get('Authorization') ?? null
+
+	const authorization = request.headers.get('Authorization')
+	if (!authorization) return null
+
+	if (!authorization.startsWith('Bearer ')) throw new BadParamsError('Only Bearer authorization is supported')
+	return authorization.slice(7).trim()
+}
+
+function getContentType(path: string): string {
+	if (path.endsWith('.ts')) return 'application/typescript'
+	if (path.endsWith('.js')) return 'application/javascript'
+	if (path.endsWith('.tsx')) return 'application/typescriptreact'
+	if (path.endsWith('.jsx')) return 'application/javascriptreact'
+	if (path.endsWith('.json')) return 'application/json'
+
+	return 'application/octet-stream'
 }
 
 export function makeRegistryHandler(fetcher: Fetcher): RegistryHandler {
-	return rooter.makeHandler([
-		registryJson,
+	return makeHandler([
+		// TODO listing routes
 
-		// TODO listing endpoints
-
-		rooter.makeRoute('*', ({ request, url }) => {
+		makeRoute('/*', async ({ request, url }) => {
 			const authToken = getAuthToken(request)
-			const meta = parsePath(url.pathname)
+			const { resource, location } = parsePath(url.pathname)
+			const expectsHtml = /^text\/html/.test(request.headers.get('Accept') ?? '')
 
-			fetcher.getResource({})
+			// If no version was specified, redirect to this same route with the latest version specified
+			if (!resource.version) {
+				const versions = await fetcher.getVersions(resource.pkg, authToken)
+				const defaultVersion = versions.find((version) => version.isDefault) || versions[0]
+				if (!defaultVersion) throw new Error('No versions exist for this package')
+
+				const headers = new Headers({ 'Location': `/${resource.pkg}@${defaultVersion.name}${resource.path}` })
+				if (authToken) headers.append('Authorization', `Bearer ${authToken}`)
+
+				return new Response(null, { status: 302, headers })
+			}
+
+			const versionedResource = resource as ResourceData
+
+			if (expectsHtml) {
+				const link = await fetcher.getResourceLink(versionedResource, location, authToken)
+
+				return new Response(null, { status: 302, headers: { 'Location': link } })
+			}
+
+			const text = await fetcher.getResource(versionedResource, authToken)
+			return new Response(text, { headers: { 'Content-Type': getContentType(resource.path) } })
 		}),
 	])
 }

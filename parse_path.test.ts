@@ -1,28 +1,35 @@
-import { assertEquals } from 'assert'
+import { assertEquals, assertThrows } from 'assert'
 import { parsePath } from './parse_path.ts'
 
-Deno.test({
-	name: 'should parse a loaded path',
-	fn() {
-		assertEquals(parsePath('/auth@1.2.3/path/to/file.ts:45:23'), {
-			repo: 'auth',
+Deno.test('should parse a loaded path', () => {
+	assertEquals(parsePath('/auth@1.2.3/path/to/file.ts:45:23'), {
+		resource: {
+			pkg: 'auth',
 			version: '1.2.3',
 			path: '/path/to/file.ts',
+		},
+		location: {
 			line: 45,
 			col: 23,
-		})
-	},
+		},
+	})
 })
 
-Deno.test({
-	name: 'should parse an unloaded path',
-	fn() {
-		assertEquals(parsePath('/auth/path/to/file.ts'), {
-			repo: 'auth',
+Deno.test('should parse an unloaded path', () => {
+	assertEquals(parsePath('/auth/path/to/file.ts'), {
+		resource: {
+			pkg: 'auth',
 			version: null,
 			path: '/path/to/file.ts',
-			line: null,
-			col: null,
-		})
-	},
+		},
+		location: null,
+	})
+})
+
+Deno.test('should not parse with no path', () => {
+	assertThrows(() => parsePath('/auth_no_filepath'))
+})
+
+Deno.test('should not parse no pkg', () => {
+	assertThrows(() => parsePath('/'))
 })
