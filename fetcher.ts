@@ -82,6 +82,11 @@ export class GitlabFetcher implements Fetcher {
 	#host: string
 	#noAuthNamespace: string
 
+	/**
+	 * A fetcher for Gitlab. Looks for a project with a path that matches the requested package name, which requires a search.
+	 *
+	 * Thus, when a user navigates to the registry in their browser (without authentication), we don't know which namespace the project
+	 * belongs in. This is why `noAuthNamespace` is an argument. If the user is not authenticated, fallback to a probable namespace */
 	constructor(host: string, noAuthNamespace: string) {
 		this.#host = host
 		this.#noAuthNamespace = noAuthNamespace
