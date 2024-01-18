@@ -9,7 +9,7 @@ A simple Deno registry that serves modules via a modular `Fetcher` (Github and G
 ## Usage
 
 ```typescript
-import { makeRegistryHandler, GithubFetcher } from 'https://denopkg.com/Vehmloewff/registry@1.0.0/mod.ts'
+import { makeRegistryHandler, GithubFetcher } from 'https://denopkg.com/Vehmloewff/deno_registry@1.0.0/mod.ts'
 
 Deno.serve(makeRegistryHandler(new GithubFetcher('Vehmloewff')))
 ```
